@@ -19,13 +19,23 @@ module.exports = {
  *
  * @param {string|number} minVersion
  * @param {boolean} includeBetas
- * @returns {object} An object with a `$meta` object (via `fetchTrains()` api), and a `releases` object (grouped by major version).
+ * @returns {object} An object with a `$meta` object (via `fetchTrains()` API), and a `releases` object (grouped by major version).
  */
 async function fetchReleases(minVersion, includeBetas = false) {
   const $meta = await fetchTrains();
-  // If `minVersion` isn't specified, set to the current release version.
-  if (!minVersion) {
-    minVersion = parseInt($meta.FIREFOX_ESR, 10);
+  const esrVersion = parseInt($meta.FIREFOX_ESR, 10);
+  const releaseVersion = parseInt($meta.LATEST_FIREFOX_VERSION, 10);
+  let $minVersion = releaseVersion;
+
+  if (Number.isNaN(minVersion) || minVersion === undefined) {
+    // If `minVersion` is non-numeric or undefined, use current ESR version.
+    $minVersion = esrVersion;
+  } else if (minVersion > 0) {
+    // If `minVersion` is a positive number, assume its an exact number.
+    $minVersion = minVersion;
+  } else if (minVersion < 0) {
+    // If `minVersion` is a negative number, assume its a relative number.
+    $minVersion = releaseVersion - Math.abs(minVersion);
   }
 
   const href = "/pub/firefox/releases/";
@@ -35,7 +45,7 @@ async function fetchReleases(minVersion, includeBetas = false) {
   $("table tbody tr td a[href*='/releases/']").each(function (i, elem) {
     // strip trailing "/".
     const ver = $(this).text().replace(/\/$/, "");
-    if (parseFloat(ver, 10) >= minVersion) {
+    if (parseFloat(ver, 10) >= $minVersion) {
       $releases.push(ver);
     }
   });
