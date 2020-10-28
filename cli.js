@@ -10,9 +10,14 @@ async function main() {
   const args = arg({
     "--include-betas": Boolean,
     "--min-version": Number,
+    "--flat": Boolean,
   });
-  const includeBetas = args["--include-betas"] || false;
+  const flat = args["--flat"];
+  const includeBetas = args["--include-betas"];
   const minVersion = args["--min-version"];
   const releases = await lib.fetchReleases(minVersion, includeBetas);
+  if (flat) {
+    releases.releases = Object.values(releases.releases).flat();
+  }
   console.log(JSON.stringify(releases, null, 2));
 }
