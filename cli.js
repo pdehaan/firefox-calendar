@@ -11,9 +11,6 @@ async function main() {
     "--min-version": Number,
     "--flat": Boolean,
   });
-  const res = await lib.fetchReleases(args.minVersion, args.includeBetas);
-  if (args.flat) {
-    res.releases = Object.values(res.releases).flat();
-  }
+  const res = await lib.fetchReleases(args.minVersion, args.includeBetas, args.flat);
   console.log(JSON.stringify(res, null, 2));
 }

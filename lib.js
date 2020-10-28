@@ -21,7 +21,7 @@ module.exports = {
  * @param {boolean} includeBetas
  * @returns {object} An object with a `$meta` object (via `fetchTrains()` API), and a `releases` object (grouped by major version).
  */
-async function fetchReleases(minVersion, includeBetas = false) {
+async function fetchReleases(minVersion, includeBetas = false, flat = false) {
   const $meta = await fetchTrains();
   const esrVersion = parseInt($meta.FIREFOX_ESR, 10);
   const releaseVersion = parseInt($meta.LATEST_FIREFOX_VERSION, 10);
@@ -34,28 +34,28 @@ async function fetchReleases(minVersion, includeBetas = false) {
     // If `minVersion` is a positive number, assume its an exact number.
     $minVersion = minVersion;
   } else if (minVersion < 0) {
-    // If `minVersion` is a negative number, assume its a relative number.
+    // If `minVersion` is a negative number, assume its a relative number (-3 means 3 most recent versions).
     $minVersion = releaseVersion - Math.abs(minVersion);
   }
 
   const href = "/pub/firefox/releases/";
   const $ = await fetchHtml(href);
-  const $releases = [];
-
-  $("table tbody tr td a[href*='/releases/']").each(function (i, elem) {
-    // strip trailing "/".
-    const ver = $(this).text().replace(/\/$/, "");
-    if (parseFloat(ver, 10) >= $minVersion) {
-      $releases.push(ver);
-    }
-  });
+  const $releases = $("table tbody tr td a[href*='/releases/']")
+    .map(function (i, elem) {
+      // strip trailing "/".
+      const ver = $(this).text().replace(/\/$/, "");
+      // Filter out any unwanted betas.
+      if (!includeBetas && ver.includes("b")) {
+        return;
+      }
+      if (parseFloat(ver, 10) >= $minVersion) {
+        return ver;
+      }
+    })
+    .get();
 
   const $data = [];
   for (const release of $releases) {
-    // Filter out any unwanted betas.
-    if (!includeBetas && release.includes("b")) {
-      continue;
-    }
     const info = await fetchReleaseVersion(release);
     info.version = info.version
       .replace(/(\d)b(\d)/, "$1 beta $2")
@@ -69,11 +69,10 @@ async function fetchReleases(minVersion, includeBetas = false) {
     $data.push(info);
   }
 
-  const releases = _.chain($data)
-    .sortBy(["date"])
-    .groupBy((rel) => parseInt(rel.version, 10))
-    .value();
-
+  let releases = _.sortBy($data, ["date"]);
+  if (!flat) {
+    releases = _.groupBy(releases, (rel) => parseInt(rel.version, 10));
+  }
   return { $meta, releases };
 }
 
@@ -104,7 +103,7 @@ async function fetchReleaseVersion(version) {
 
 /**
  * Fetch firefox_versions.json file...
- * @returns {object} 
+ * @returns {object}
  */
 async function fetchTrains() {
   const href = "https://product-details.mozilla.org/1.0/firefox_versions.json";
@@ -115,7 +114,7 @@ async function fetchTrains() {
 
 /**
  * Fetch a remote HTML page and parse it w/ cheerio.
- * @param {string} href 
+ * @param {string} href
  * @returns {cheerio.Root}
  */
 async function fetchHtml(href) {
